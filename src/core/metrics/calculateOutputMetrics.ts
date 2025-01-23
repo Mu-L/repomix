@@ -17,7 +17,8 @@ const initializeWorkerPool = (): Piscina => {
   }
 
   workerPool = new Piscina({
-    filename: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './workers/tokenCountWorker.js'),
+    filename: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './workers/outputMetricsWorker.js'),
+    // Set minThreads and maxThreads to 1
     minThreads: 1,
     maxThreads: 1,
     idleTimeout: 5000,

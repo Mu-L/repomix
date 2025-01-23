@@ -20,54 +20,18 @@ const initializeWorkerPool = (numOfTasks: number): Piscina => {
     return workerPool;
   }
 
-  const { minThreads, maxThreads } = getWorkerThreadCount(numOfTasks);
+  const { minThreads, maxThreads } = getWorkerThreadCount( numOfTasks);
   logger.trace(`Initializing worker pool with min=${minThreads}, max=${maxThreads} threads`);
 
   workerPool = new Piscina({
-    filename: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './workers/metricsWorker.js'),
+    filename: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './workers/fileMetricsWorker.js'),
     minThreads,
     maxThreads,
-    idleTimeout: 5000,
+    idleTimeout: 5000
   });
 
   return workerPool;
 };
-
-/**
- * Process files in chunks to maintain progress visibility
- */
-async function processFileChunks(
-  pool: Piscina,
-  tasks: Array<{ file: ProcessedFile; index: number; totalFiles: number; encoding: TiktokenEncoding }>,
-  progressCallback: RepomixProgressCallback,
-  chunkSize = 100,
-): Promise<FileMetrics[]> {
-  const results: FileMetrics[] = [];
-  let completedTasks = 0;
-  const totalTasks = tasks.length;
-
-  // Process files in chunks
-  for (let i = 0; i < tasks.length; i += chunkSize) {
-    const chunk = tasks.slice(i, i + chunkSize);
-    const chunkPromises = chunk.map(task => {
-      return pool.run(task).then(result => {
-        completedTasks++;
-        progressCallback(
-          `Calculating metrics... (${completedTasks}/${totalTasks}) ${pc.dim(task.file.path)}`
-        );
-        return result;
-      });
-    });
-
-    const chunkResults = await Promise.all(chunkPromises);
-    results.push(...chunkResults);
-
-    // Allow event loop to process other tasks
-    await new Promise(resolve => setTimeout(resolve, 0));
-  }
-
-  return results;
-}
 
 /**
  * Calculate metrics for all files using a worker thread pool
@@ -89,8 +53,12 @@ export const calculateAllFileMetrics = async (
     const startTime = process.hrtime.bigint();
     logger.trace(`Starting metrics calculation for ${processedFiles.length} files using worker pool`);
 
-    // Process files in chunks
-    const results = await processFileChunks(pool, tasks, progressCallback);
+    const results = await Promise.all(
+      tasks.map(task => pool.run(task).then(result => {
+        progressCallback(`Calculating metrics... (${task.index + 1}/${task.totalFiles}) ${pc.dim(task.file.path)}`);
+        return result;
+      }))
+    );
 
     const endTime = process.hrtime.bigint();
     const duration = Number(endTime - startTime) / 1e6;
