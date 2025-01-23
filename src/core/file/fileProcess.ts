@@ -1,12 +1,11 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import pc from 'picocolors';
 import { Piscina } from 'piscina';
+import { fileURLToPath } from 'url';
+import pc from 'picocolors';
 import type { RepomixConfigMerged } from '../../config/configSchema.js';
 import { logger } from '../../shared/logger.js';
 import { getWorkerThreadCount } from '../../shared/processConcurrency.js';
 import type { RepomixProgressCallback } from '../../shared/types.js';
-import { getFileManipulator } from './fileManipulate.js';
 import type { ProcessedFile, RawFile } from './fileTypes.js';
 
 // Worker pool singleton
@@ -15,13 +14,13 @@ let workerPool: Piscina | null = null;
 /**
  * Initialize the worker pool
  */
-const initializeWorkerPool = (): Piscina => {
+const initializeWorkerPool = (numOfTasks: number): Piscina => {
   if (workerPool) {
     return workerPool;
   }
 
-  const { minThreads, maxThreads } = getWorkerThreadCount();
-  logger.trace(`Initializing file process worker pool with min=${minThreads}, max=${maxThreads} threads`);
+  const { minThreads, maxThreads } = getWorkerThreadCount( numOfTasks);
+  logger.trace(`Initializing worker pool with min=${minThreads}, max=${maxThreads} threads`);
 
   workerPool = new Piscina({
     filename: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './workers/fileProcessWorker.js'),
@@ -34,7 +33,7 @@ const initializeWorkerPool = (): Piscina => {
 };
 
 /**
- * Process files in chunks to maintain progress visibility and prevent memory issues
+ * Process files in chunks to maintain progress visibility
  */
 async function processFileChunks(
   pool: Piscina,
@@ -49,8 +48,8 @@ async function processFileChunks(
   // Process files in chunks
   for (let i = 0; i < tasks.length; i += chunkSize) {
     const chunk = tasks.slice(i, i + chunkSize);
-    const chunkPromises = chunk.map((task) => {
-      return pool.run(task).then((result) => {
+    const chunkPromises = chunk.map(task => {
+      return pool.run(task).then(result => {
         completedTasks++;
         progressCallback(`Processing file... (${completedTasks}/${totalTasks}) ${pc.dim(task.rawFile.path)}`);
         return result;
@@ -61,7 +60,7 @@ async function processFileChunks(
     results.push(...chunkResults);
 
     // Allow event loop to process other tasks
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   return results;
@@ -75,7 +74,7 @@ export const processFiles = async (
   config: RepomixConfigMerged,
   progressCallback: RepomixProgressCallback,
 ): Promise<ProcessedFile[]> => {
-  const pool = initializeWorkerPool();
+  const pool = initializeWorkerPool(rawFiles.length);
   const tasks = rawFiles.map((rawFile, index) => ({
     rawFile,
     index,
@@ -110,40 +109,4 @@ export const cleanupWorkerPool = async (): Promise<void> => {
     await workerPool.destroy();
     workerPool = null;
   }
-};
-
-export const processContent = async (
-  content: string,
-  filePath: string,
-  config: RepomixConfigMerged,
-): Promise<string> => {
-  let processedContent = content;
-  const manipulator = getFileManipulator(filePath);
-
-  logger.trace(`Processing file: ${filePath}`);
-
-  const processStartAt = process.hrtime.bigint();
-
-  if (config.output.removeComments && manipulator) {
-    processedContent = manipulator.removeComments(processedContent);
-  }
-
-  if (config.output.removeEmptyLines && manipulator) {
-    processedContent = manipulator.removeEmptyLines(processedContent);
-  }
-
-  processedContent = processedContent.trim();
-
-  if (config.output.showLineNumbers) {
-    const lines = processedContent.split('\n');
-    const padding = lines.length.toString().length;
-    const numberedLines = lines.map((line, index) => `${(index + 1).toString().padStart(padding)}: ${line}`);
-    processedContent = numberedLines.join('\n');
-  }
-
-  const processEndAt = process.hrtime.bigint();
-
-  logger.trace(`Processed file: ${filePath}. Took: ${(Number(processEndAt - processStartAt) / 1e6).toFixed(2)}ms`);
-
-  return processedContent;
 };

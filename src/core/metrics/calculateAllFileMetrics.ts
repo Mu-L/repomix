@@ -1,14 +1,13 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import pc from 'picocolors';
 import { Piscina } from 'piscina';
+import { fileURLToPath } from 'url';
+import pc from 'picocolors';
 import type { TiktokenEncoding } from 'tiktoken';
 import { logger } from '../../shared/logger.js';
 import { getWorkerThreadCount } from '../../shared/processConcurrency.js';
 import type { RepomixProgressCallback } from '../../shared/types.js';
 import type { ProcessedFile } from '../file/fileTypes.js';
-import type { TokenCounter } from '../tokenCount/tokenCount.js';
-import type { FileMetrics } from './calculateIndividualFileMetrics.js';
+import type { FileMetrics } from './workers/types.js';
 
 // Worker pool singleton
 let workerPool: Piscina | null = null;
@@ -16,13 +15,13 @@ let workerPool: Piscina | null = null;
 /**
  * Initialize the worker pool
  */
-const initializeWorkerPool = (): Piscina => {
+const initializeWorkerPool = (numOfTasks: number): Piscina => {
   if (workerPool) {
     return workerPool;
   }
 
-  const { minThreads, maxThreads } = getWorkerThreadCount();
-  logger.trace(`Initializing metrics worker pool with min=${minThreads}, max=${maxThreads} threads`);
+  const { minThreads, maxThreads } = getWorkerThreadCount(numOfTasks);
+  logger.trace(`Initializing worker pool with min=${minThreads}, max=${maxThreads} threads`);
 
   workerPool = new Piscina({
     filename: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './workers/metricsWorker.js'),
@@ -35,7 +34,7 @@ const initializeWorkerPool = (): Piscina => {
 };
 
 /**
- * Process files in chunks to maintain progress visibility and prevent memory issues
+ * Process files in chunks to maintain progress visibility
  */
 async function processFileChunks(
   pool: Piscina,
@@ -50,10 +49,12 @@ async function processFileChunks(
   // Process files in chunks
   for (let i = 0; i < tasks.length; i += chunkSize) {
     const chunk = tasks.slice(i, i + chunkSize);
-    const chunkPromises = chunk.map((task) => {
-      return pool.run(task).then((result) => {
+    const chunkPromises = chunk.map(task => {
+      return pool.run(task).then(result => {
         completedTasks++;
-        progressCallback(`Calculating metrics... (${completedTasks}/${totalTasks}) ${pc.dim(task.file.path)}`);
+        progressCallback(
+          `Calculating metrics... (${completedTasks}/${totalTasks}) ${pc.dim(task.file.path)}`
+        );
         return result;
       });
     });
@@ -62,7 +63,7 @@ async function processFileChunks(
     results.push(...chunkResults);
 
     // Allow event loop to process other tasks
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   return results;
@@ -76,7 +77,7 @@ export const calculateAllFileMetrics = async (
   tokenCounterEncoding: TiktokenEncoding,
   progressCallback: RepomixProgressCallback,
 ): Promise<FileMetrics[]> => {
-  const pool = initializeWorkerPool();
+  const pool = initializeWorkerPool(processedFiles.length);
   const tasks = processedFiles.map((file, index) => ({
     file,
     index,
@@ -92,7 +93,7 @@ export const calculateAllFileMetrics = async (
     const results = await processFileChunks(pool, tasks, progressCallback);
 
     const endTime = process.hrtime.bigint();
-    const duration = Number(endTime - startTime) / 1e6; // Convert to milliseconds
+    const duration = Number(endTime - startTime) / 1e6;
     logger.trace(`Metrics calculation completed in ${duration.toFixed(2)}ms`);
 
     return results;

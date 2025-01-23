@@ -6,7 +6,7 @@ import { logger } from '../../../shared/logger.js';
 /**
  * Create SecretLint configuration for the worker
  */
-export const createSecretLintConfig = (): SecretLintCoreConfig => ({
+const createSecretLintConfig = (): SecretLintCoreConfig => ({
   rules: [
     {
       id: '@secretlint/secretlint-rule-preset-recommend',
@@ -18,7 +18,7 @@ export const createSecretLintConfig = (): SecretLintCoreConfig => ({
 /**
  * Run SecretLint check on a single file
  */
-export const runSecretLint = async (
+const runSecretLint = async (
   filePath: string,
   content: string,
   config: SecretLintCoreConfig,

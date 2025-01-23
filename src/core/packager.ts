@@ -38,7 +38,7 @@ export const pack = async (
   const { filePaths } = await deps.searchFiles(rootDir, config);
 
   progressCallback('Collecting files...');
-  const rawFiles = await deps.collectFiles(filePaths, rootDir);
+  const rawFiles = await deps.collectFiles(filePaths, rootDir, progressCallback);
 
   const { safeFilePaths, safeRawFiles, suspiciousFilesResults } = await deps.validateFileSafety(
     rawFiles,

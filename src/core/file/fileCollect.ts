@@ -1,71 +1,110 @@
-import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import iconv from 'iconv-lite';
-import { isBinary } from 'istextorbinary';
-import jschardet from 'jschardet';
-import pMap from 'p-map';
+import { fileURLToPath } from 'node:url';
+import { Piscina } from 'piscina';
 import { logger } from '../../shared/logger.js';
-import { getProcessConcurrency } from '../../shared/processConcurrency.js';
+import { getWorkerThreadCount } from '../../shared/processConcurrency.js';
 import type { RawFile } from './fileTypes.js';
+import { RepomixProgressCallback } from '../../shared/types.js';
+import pc from 'picocolors';
 
-// Maximum file size to process (50MB)
-// This prevents out-of-memory errors when processing very large files
-export const MAX_FILE_SIZE = 50 * 1024 * 1024;
+// Worker pool singleton
+let workerPool: Piscina | null = null;
 
-export const collectFiles = async (filePaths: string[], rootDir: string): Promise<RawFile[]> => {
-  const rawFiles = await pMap(
-    filePaths,
-    async (filePath) => {
-      const fullPath = path.resolve(rootDir, filePath);
-      const content = await readRawFile(fullPath);
-      if (content) {
-        return { path: filePath, content };
-      }
-      return null;
-    },
-    {
-      concurrency: getProcessConcurrency(),
-    },
-  );
+/**
+ * Initialize the worker pool with the given configuration
+ */
+const initializeWorkerPool = (numOfTasks: number): Piscina => {
+  if (workerPool) {
+    return workerPool;
+  }
 
-  return rawFiles.filter((file): file is RawFile => file != null);
+  const { minThreads, maxThreads } = getWorkerThreadCount( numOfTasks);
+  logger.trace(`Initializing worker pool with min=${minThreads}, max=${maxThreads} threads`);
+
+  workerPool = new Piscina({
+    filename: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './workers/fileCollectWorker.js'),
+    minThreads,
+    maxThreads,
+    idleTimeout: 5000
+  });
+
+  return workerPool;
 };
 
-const readRawFile = async (filePath: string): Promise<string | null> => {
+/**
+ * Process files in chunks to maintain progress visibility and prevent memory issues
+ */
+async function processFileChunks(
+  pool: Piscina,
+  tasks: Array<{ filePath: string; rootDir: string }>,
+  progressCallback: RepomixProgressCallback,
+  chunkSize = 100,
+): Promise<RawFile[]> {
+  const results: RawFile[] = [];
+  let completedTasks = 0;
+  const totalTasks = tasks.length;
+
+  // Process files in chunks
+  for (let i = 0; i < tasks.length; i += chunkSize) {
+    const chunk = tasks.slice(i, i + chunkSize);
+    const chunkPromises = chunk.map((task) => {
+      return pool.run(task).then((result) => {
+        completedTasks++;
+        progressCallback(`Collect file... (${completedTasks}/${totalTasks}) ${pc.dim(task.filePath)}`);
+        logger.trace(`Collect files... (${completedTasks}/${totalTasks}) ${task.filePath}`);
+        return result;
+      });
+    });
+
+    const chunkResults = await Promise.all(chunkPromises);
+    results.push(...chunkResults.filter((file): file is RawFile => file !== null));
+
+    // Allow event loop to process other tasks
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  return results;
+}
+
+/**
+ * Collects and reads files using a worker thread pool
+ */
+export const collectFiles = async (
+  filePaths: string[],
+  rootDir: string,
+  progressCallback: RepomixProgressCallback,
+): Promise<RawFile[]> => {
+  const pool = initializeWorkerPool(filePaths.length);
+  const tasks = filePaths.map((filePath) => ({
+    filePath,
+    rootDir,
+  }));
+
   try {
-    const stats = await fs.stat(filePath);
+    const startTime = process.hrtime.bigint();
+    logger.trace(`Starting file collection for ${filePaths.length} files using worker pool`);
 
-    if (stats.size > MAX_FILE_SIZE) {
-      const sizeMB = (stats.size / 1024 / 1024).toFixed(1);
-      logger.log('');
-      logger.log('⚠️ Large File Warning:');
-      logger.log('──────────────────────');
-      logger.log(`File exceeds size limit: ${sizeMB}MB > ${MAX_FILE_SIZE / 1024 / 1024}MB (${filePath})`);
-      logger.note('Add this file to .repomixignore if you want to exclude it permanently');
-      logger.log('');
-      return null;
-    }
+    // Process files in chunks
+    const results = await processFileChunks(pool, tasks, progressCallback);
 
-    if (isBinary(filePath)) {
-      logger.debug(`Skipping binary file: ${filePath}`);
-      return null;
-    }
+    const endTime = process.hrtime.bigint();
+    const duration = Number(endTime - startTime) / 1e6; // Convert to milliseconds
+    logger.trace(`File collection completed in ${duration.toFixed(2)}ms`);
 
-    logger.trace(`Reading file: ${filePath}`);
-
-    const buffer = await fs.readFile(filePath);
-
-    if (isBinary(null, buffer)) {
-      logger.debug(`Skipping binary file (content check): ${filePath}`);
-      return null;
-    }
-
-    const encoding = jschardet.detect(buffer).encoding || 'utf-8';
-    const content = iconv.decode(buffer, encoding);
-
-    return content;
+    return results;
   } catch (error) {
-    logger.warn(`Failed to read file: ${filePath}`, error);
-    return null;
+    logger.error('Error during file collection:', error);
+    throw error;
+  }
+};
+
+/**
+ * Cleanup worker pool resources
+ */
+export const cleanupWorkerPool = async (): Promise<void> => {
+  if (workerPool) {
+    logger.trace('Cleaning up worker pool');
+    await workerPool.destroy();
+    workerPool = null;
   }
 };

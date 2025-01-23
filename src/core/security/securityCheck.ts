@@ -1,9 +1,9 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import pc from 'picocolors';
 import { Piscina } from 'piscina';
+import { fileURLToPath } from 'url';
+import pc from 'picocolors';
 import { logger } from '../../shared/logger.js';
-import { getWorkerThreadCount } from '../../shared/processConcurrency.js';
+import { getProcessConcurrency, getWorkerThreadCount } from '../../shared/processConcurrency.js';
 import type { RepomixProgressCallback } from '../../shared/types.js';
 import type { RawFile } from '../file/fileTypes.js';
 
@@ -18,13 +18,13 @@ let workerPool: Piscina | null = null;
 /**
  * Initialize the worker pool
  */
-const initializeWorkerPool = (): Piscina => {
+const initializeWorkerPool = (numOfTasks: number): Piscina => {
   if (workerPool) {
     return workerPool;
   }
 
-  const { minThreads, maxThreads } = getWorkerThreadCount();
-  logger.trace(`Initializing security check worker pool with min=${minThreads}, max=${maxThreads} threads`);
+  const { minThreads, maxThreads } = getWorkerThreadCount(numOfTasks);
+  logger.trace(`Initializing worker pool with min=${minThreads}, max=${maxThreads} threads`);
 
   workerPool = new Piscina({
     filename: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './workers/securityCheckWorker.js'),
@@ -54,7 +54,7 @@ async function processFileChunks(
   pool: Piscina,
   tasks: Array<{ filePath: string; content: string }>,
   progressCallback: RepomixProgressCallback,
-  chunkSize = 100,
+  chunkSize = 100
 ): Promise<SuspiciousFileResult[]> {
   const results: SuspiciousFileResult[] = [];
   let completedTasks = 0;
@@ -63,10 +63,13 @@ async function processFileChunks(
   // Process files in chunks
   for (let i = 0; i < tasks.length; i += chunkSize) {
     const chunk = tasks.slice(i, i + chunkSize);
-    const chunkPromises = chunk.map((task) => {
-      return pool.run(task).then((result) => {
+    const chunkPromises = chunk.map(task => {
+      return pool.run(task).then(result => {
         completedTasks++;
-        progressCallback(`Running security check... (${completedTasks}/${totalTasks}) ${pc.dim(task.filePath)}`);
+        const percent = ((completedTasks / totalTasks) * 100).toFixed(1);
+        progressCallback(
+          `Running security check... (${completedTasks}/${totalTasks}) ${pc.dim(task.filePath)}`
+        );
         return result;
       });
     });
@@ -75,7 +78,7 @@ async function processFileChunks(
     results.push(...chunkResults.filter((result): result is SuspiciousFileResult => result !== null));
 
     // Allow event loop to process other tasks
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 
   return results;
@@ -88,8 +91,8 @@ export const runSecurityCheck = async (
   rawFiles: RawFile[],
   progressCallback: RepomixProgressCallback = () => {},
 ): Promise<SuspiciousFileResult[]> => {
-  const pool = initializeWorkerPool();
-  const tasks = rawFiles.map((file) => ({
+  const pool = initializeWorkerPool(rawFiles.length);
+  const tasks = rawFiles.map(file => ({
     filePath: file.path,
     content: file.content,
   }));

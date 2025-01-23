@@ -13,14 +13,14 @@ interface FileProcessWorkerInput {
 /**
  * Worker thread function that processes a single file
  */
-export default async ({ rawFile, index, totalFiles, config }: FileProcessWorkerInput): Promise<ProcessedFile> => {
+export default async ({ rawFile, config }: FileProcessWorkerInput): Promise<ProcessedFile> => {
   const processStartAt = process.hrtime.bigint();
   let processedContent = rawFile.content;
   const manipulator = getFileManipulator(rawFile.path);
 
   logger.trace(`Processing file: ${rawFile.path}`);
 
-  if (config.output.removeComments && manipulator) {
+  if (manipulator && config.output.removeComments) {
     processedContent = manipulator.removeComments(processedContent);
   }
 
