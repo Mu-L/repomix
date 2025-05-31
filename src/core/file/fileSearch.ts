@@ -1,3 +1,4 @@
+import type { Stats } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { globby } from 'globby';
@@ -92,7 +93,42 @@ export const normalizeGlobPattern = (pattern: string): string => {
 
 // Get all file paths considering the config
 export const searchFiles = async (rootDir: string, config: RepomixConfigMerged): Promise<FileSearchResult> => {
-  // First check directory permissions
+  // Check if the path exists and get its type
+  let pathStats: Stats;
+  try {
+    pathStats = await fs.stat(rootDir);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error) {
+      const errorCode = (error as NodeJS.ErrnoException).code;
+      if (errorCode === 'ENOENT') {
+        throw new RepomixError(`Target path does not exist: ${rootDir}`);
+      }
+      if (errorCode === 'EPERM' || errorCode === 'EACCES') {
+        throw new PermissionError(
+          `Permission denied while accessing path. Please check folder access permissions for your terminal app. path: ${rootDir}`,
+          rootDir,
+          errorCode,
+        );
+      }
+      // Handle other specific error codes with more context
+      throw new RepomixError(`Failed to access path: ${rootDir}. Error code: ${errorCode}. ${error.message}`);
+    }
+    // Preserve original error stack trace for debugging
+    const repomixError = new RepomixError(
+      `Failed to access path: ${rootDir}. Reason: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
+    );
+    repomixError.cause = error;
+    throw repomixError;
+  }
+
+  // Check if the path is a directory
+  if (!pathStats.isDirectory()) {
+    throw new RepomixError(
+      `Target path is not a directory: ${rootDir}. Please specify a directory path, not a file path.`,
+    );
+  }
+
+  // Now check directory permissions
   const permissionCheck = await checkDirectoryPermissions(rootDir);
 
   if (permissionCheck.details?.read !== true) {

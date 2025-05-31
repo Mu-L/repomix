@@ -1,154 +1,252 @@
 # Server MCP
 
+Repomix mendukung [Model Context Protocol (MCP)](https://modelcontextprotocol.io), memungkinkan asisten AI untuk berinteraksi langsung dengan codebase Anda. Ketika dijalankan sebagai server MCP, Repomix menyediakan tools yang memungkinkan asisten AI untuk mengemas repository lokal atau remote untuk analisis tanpa memerlukan persiapan file manual.
 
-Server MCP (Model Code Provider) adalah fitur Repomix yang menyediakan antarmuka HTTP untuk mengakses dan memproses basis kode Anda. Ini memungkinkan alat dan layanan lain untuk berinteraksi dengan Repomix melalui API.
+> [!NOTE]  
+> Ini adalah fitur eksperimental yang akan kami tingkatkan secara aktif berdasarkan feedback pengguna dan penggunaan dunia nyata
 
-## Memulai Server
+## Menjalankan Repomix sebagai Server MCP
 
-Untuk memulai server MCP, gunakan flag `--mcp`:
+Untuk menjalankan Repomix sebagai server MCP, gunakan flag `--mcp`:
 
 ```bash
 repomix --mcp
 ```
 
-Secara default, server akan berjalan di port 3000. Anda dapat menentukan port yang berbeda menggunakan flag `--mcp-port`:
+Ini memulai Repomix dalam mode server MCP, membuatnya tersedia untuk asisten AI yang mendukung Model Context Protocol.
 
-```bash
-repomix --mcp --mcp-port 8080
-```
+## Konfigurasi Server MCP
 
-## Endpoint API
+Untuk menggunakan Repomix sebagai server MCP dengan asisten AI seperti Claude, Anda perlu mengkonfigurasi pengaturan MCP:
 
-Server MCP menyediakan beberapa endpoint API:
+### Untuk VS Code
 
-### GET /
+Anda dapat menginstal server MCP Repomix di VS Code menggunakan salah satu metode berikut:
 
-Mengembalikan informasi dasar tentang server MCP.
+1. **Menggunakan badge instalasi:**
 
-**Contoh Respons:**
+  [![Install in VS Code](https://img.shields.io/badge/VS_Code-VS_Code?style=flat-square&label=Install%20Server&color=0098FF)](vscode:mcp/install?%7B%22name%22%3A%22repomix%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22repomix%22%2C%22--mcp%22%5D%7D)<br>
+  [![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-VS_Code_Insiders?style=flat-square&label=Install%20Server&color=24bfa5)](vscode-insiders:mcp/install?%7B%22name%22%3A%22repomix%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22repomix%22%2C%22--mcp%22%5D%7D)
+
+2. **Menggunakan command line:**
+
+  ```bash
+  code --add-mcp '{"name":"repomix","command":"npx","args":["-y","repomix","--mcp"]}'
+  ```
+
+  Untuk VS Code Insiders:
+  ```bash
+  code-insiders --add-mcp '{"name":"repomix","command":"npx","args":["-y","repomix","--mcp"]}'
+  ```
+
+### Untuk Cline (ekstensi VS Code)
+
+Edit file `cline_mcp_settings.json`:
 
 ```json
 {
-  "name": "Repomix MCP Server",
-  "version": "1.0.0",
-  "status": "running"
-}
-```
-
-### GET /files
-
-Mengembalikan daftar semua file dalam repositori.
-
-**Contoh Respons:**
-
-```json
-{
-  "files": [
-    {
-      "path": "src/index.js",
-      "language": "javascript",
-      "tokens": 120
-    },
-    {
-      "path": "src/utils.js",
-      "language": "javascript",
-      "tokens": 85
+  "mcpServers": {
+    "repomix": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "repomix",
+        "--mcp"
+      ]
     }
-  ]
-}
-```
-
-### GET /file/:path
-
-Mengembalikan konten file tertentu.
-
-**Parameter:**
-- `path`: Jalur file (URL-encoded)
-
-**Contoh Permintaan:**
-```
-GET /file/src%2Findex.js
-```
-
-**Contoh Respons:**
-
-```json
-{
-  "path": "src/index.js",
-  "language": "javascript",
-  "tokens": 120,
-  "content": "// Kode sumber di sini"
-}
-```
-
-### GET /repomix
-
-Mengembalikan seluruh output Repomix dalam format yang ditentukan.
-
-**Parameter Query:**
-- `style`: Format output (`xml`, `markdown`, `plain`). Default: `xml`
-- `removeComments`: Menghapus komentar (`true`, `false`). Default: `false`
-- `showLineNumbers`: Menampilkan nomor baris (`true`, `false`). Default: `true`
-
-**Contoh Permintaan:**
-```
-GET /repomix?style=markdown&removeComments=true
-```
-
-**Contoh Respons:**
-
-```json
-{
-  "content": "# Repomix Output\n\n## Files\n\n### src/index.js\n\n```javascript\n// Kode sumber di sini\n```"
-}
-```
-
-## Integrasi dengan Alat Lain
-
-Server MCP dapat diintegrasikan dengan berbagai alat dan layanan:
-
-### Integrasi IDE
-
-Anda dapat membuat ekstensi IDE yang berkomunikasi dengan server MCP untuk menyediakan wawasan AI tentang kode Anda langsung di IDE.
-
-### Integrasi CI/CD
-
-Integrasikan server MCP ke dalam pipeline CI/CD Anda untuk menghasilkan dokumentasi atau analisis kode otomatis.
-
-### Aplikasi Web Kustom
-
-Buat aplikasi web kustom yang menggunakan API server MCP untuk menyediakan antarmuka yang ramah pengguna untuk berinteraksi dengan basis kode Anda.
-
-## Keamanan
-
-Secara default, server MCP hanya mendengarkan pada localhost (`127.0.0.1`), yang berarti hanya dapat diakses dari mesin yang sama. Jika Anda perlu mengaksesnya dari mesin lain, Anda dapat menggunakan flag `--mcp-host`:
-
-```bash
-repomix --mcp --mcp-host 0.0.0.0
-```
-
-> [!WARNING]
-> Mengatur host ke `0.0.0.0` akan membuat server dapat diakses dari jaringan. Pastikan untuk mengamankan akses dengan benar, terutama jika server menangani kode sumber sensitif.
-
-## Konfigurasi
-
-Anda dapat mengonfigurasi server MCP dalam file konfigurasi Anda:
-
-```json
-{
-  "mcp": {
-    "enabled": true,
-    "port": 8080,
-    "host": "127.0.0.1"
   }
 }
 ```
 
-## Kasus Penggunaan
+### Untuk Cursor
 
-Server MCP sangat berguna untuk:
+Di Cursor, tambahkan server MCP baru dari `Cursor Settings` > `MCP` > `+ Add new global MCP server` dengan konfigurasi serupa dengan Cline.
 
-- Menyediakan akses ke basis kode untuk alat AI eksternal
-- Membangun antarmuka kustom untuk berinteraksi dengan basis kode Anda
-- Mengintegrasikan Repomix ke dalam alur kerja dan alat yang ada
-- Menyediakan layanan analisis kode untuk tim pengembangan
+### Untuk Claude Desktop
+
+Edit file `claude_desktop_config.json` dengan konfigurasi serupa dengan Cline.
+
+### Untuk Claude Code
+
+Untuk mengkonfigurasi Repomix sebagai server MCP di [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), gunakan perintah berikut:
+
+```bash
+claude mcp add repomix -- npx -y repomix --mcp
+```
+
+### Menggunakan Docker sebagai pengganti npx
+
+Sebagai pengganti menggunakan npx, Anda dapat menggunakan Docker untuk menjalankan Repomix sebagai server MCP:
+
+```json
+{
+  "mcpServers": {
+    "repomix-docker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "ghcr.io/yamadashy/repomix",
+        "--mcp"
+      ]
+    }
+  }
+}
+```
+
+## Tools MCP yang Tersedia
+
+Ketika dijalankan sebagai server MCP, Repomix menyediakan tools berikut:
+
+### pack_codebase
+
+Tool ini mengemas direktori kode lokal ke dalam file XML untuk analisis AI. Tool ini menganalisis struktur codebase, mengekstrak konten kode yang relevan, dan menghasilkan laporan komprehensif termasuk metrik, pohon file, dan konten kode yang diformat.
+
+**Parameter:**
+- `directory`: (Wajib) Path absolut ke direktori yang akan dikemas
+- `compress`: (Opsional, default: false) Mengaktifkan kompresi Tree-sitter untuk mengekstrak signature kode esensial dan struktur sambil menghapus detail implementasi. Mengurangi penggunaan token sekitar 70% sambil mempertahankan makna semantik. Umumnya tidak diperlukan karena grep_repomix_output memungkinkan pengambilan konten incremental. Gunakan hanya ketika Anda khusus membutuhkan konten codebase lengkap untuk repository besar.
+- `includePatterns`: (Opsional) Menentukan file yang akan disertakan menggunakan pola fast-glob. Beberapa pola dapat dipisahkan dengan koma (contoh: "**/*.{js,ts}", "src/**,docs/**"). Hanya file yang cocok yang akan diproses.
+- `ignorePatterns`: (Opsional) Menentukan file tambahan yang akan dikecualikan menggunakan pola fast-glob. Beberapa pola dapat dipisahkan dengan koma (contoh: "test/**,*.spec.js", "node_modules/**,dist/**"). Pola ini melengkapi .gitignore dan eksklusi built-in.
+- `topFilesLength`: (Opsional, default: 10) Jumlah file terbesar berdasarkan ukuran untuk ditampilkan dalam ringkasan metrik untuk analisis codebase.
+
+**Contoh:**
+```json
+{
+  "directory": "/path/to/your/project",
+  "compress": false,
+  "includePatterns": "src/**/*.ts,**/*.md",
+  "ignorePatterns": "**/*.log,tmp/",
+  "topFilesLength": 10
+}
+```
+
+### pack_remote_repository
+
+Tool ini mengambil, mengkloning, dan mengemas repository GitHub ke dalam file XML untuk analisis AI. Tool ini secara otomatis mengkloning repository remote, menganalisis strukturnya, dan menghasilkan laporan komprehensif.
+
+**Parameter:**
+- `remote`: (Wajib) URL repository GitHub atau format user/repo (contoh: "yamadashy/repomix", "https://github.com/user/repo", atau "https://github.com/user/repo/tree/branch")
+- `compress`: (Opsional, default: false) Mengaktifkan kompresi Tree-sitter untuk mengekstrak signature kode esensial dan struktur sambil menghapus detail implementasi. Mengurangi penggunaan token sekitar 70% sambil mempertahankan makna semantik. Umumnya tidak diperlukan karena grep_repomix_output memungkinkan pengambilan konten incremental. Gunakan hanya ketika Anda khusus membutuhkan konten codebase lengkap untuk repository besar.
+- `includePatterns`: (Opsional) Menentukan file yang akan disertakan menggunakan pola fast-glob. Beberapa pola dapat dipisahkan dengan koma (contoh: "**/*.{js,ts}", "src/**,docs/**"). Hanya file yang cocok yang akan diproses.
+- `ignorePatterns`: (Opsional) Menentukan file tambahan yang akan dikecualikan menggunakan pola fast-glob. Beberapa pola dapat dipisahkan dengan koma (contoh: "test/**,*.spec.js", "node_modules/**,dist/**"). Pola ini melengkapi .gitignore dan eksklusi built-in.
+- `topFilesLength`: (Opsional, default: 10) Jumlah file terbesar berdasarkan ukuran untuk ditampilkan dalam ringkasan metrik untuk analisis codebase.
+
+**Contoh:**
+```json
+{
+  "remote": "yamadashy/repomix",
+  "compress": false,
+  "includePatterns": "src/**/*.ts,**/*.md",
+  "ignorePatterns": "**/*.log,tmp/",
+  "topFilesLength": 10
+}
+```
+
+### read_repomix_output
+
+Tool ini membaca konten file output yang dihasilkan oleh Repomix. Mendukung pembacaan parsial dengan spesifikasi rentang baris untuk file besar. Tool ini dirancang untuk lingkungan di mana akses filesystem langsung terbatas.
+
+**Parameter:**
+- `outputId`: (Wajib) ID file output Repomix untuk dibaca
+- `startLine`: (Opsional) Nomor baris awal (berbasis 1, inklusif). Jika tidak ditentukan, membaca dari awal.
+- `endLine`: (Opsional) Nomor baris akhir (berbasis 1, inklusif). Jika tidak ditentukan, membaca hingga akhir.
+
+**Fitur:**
+- Dirancang khusus untuk lingkungan berbasis web atau aplikasi sandbox
+- Mengambil konten output yang dihasilkan sebelumnya menggunakan ID mereka
+- Menyediakan akses aman ke codebase yang dikemas tanpa memerlukan akses filesystem
+- Mendukung pembacaan parsial untuk file besar
+
+**Contoh:**
+```json
+{
+  "outputId": "8f7d3b1e2a9c6054",
+  "startLine": 100,
+  "endLine": 200
+}
+```
+
+### grep_repomix_output
+
+Tool ini mencari pola dalam file output Repomix menggunakan fungsionalitas mirip grep dengan sintaks JavaScript RegExp. Mengembalikan baris yang cocok dengan baris konteks opsional di sekitar kecocokan.
+
+**Parameter:**
+- `outputId`: (Wajib) ID file output Repomix untuk dicari
+- `pattern`: (Wajib) Pola pencarian (sintaks regular expression JavaScript RegExp)
+- `contextLines`: (Opsional, default: 0) Jumlah baris konteks untuk ditampilkan sebelum dan sesudah setiap kecocokan. Diganti oleh beforeLines/afterLines jika ditentukan.
+- `beforeLines`: (Opsional) Jumlah baris konteks untuk ditampilkan sebelum setiap kecocokan (seperti grep -B). Mengambil prioritas atas contextLines.
+- `afterLines`: (Opsional) Jumlah baris konteks untuk ditampilkan setelah setiap kecocokan (seperti grep -A). Mengambil prioritas atas contextLines.
+- `ignoreCase`: (Opsional, default: false) Melakukan pencocokan case-insensitive
+
+**Fitur:**
+- Menggunakan sintaks JavaScript RegExp untuk pencocokan pola yang kuat
+- Mendukung baris konteks untuk pemahaman kecocokan yang lebih baik
+- Memungkinkan kontrol terpisah dari baris konteks sebelum/sesudah
+- Opsi pencarian case-sensitive dan case-insensitive
+
+**Contoh:**
+```json
+{
+  "outputId": "8f7d3b1e2a9c6054",
+  "pattern": "function\\s+\\w+\\(",
+  "contextLines": 3,
+  "ignoreCase": false
+}
+```
+
+### file_system_read_file dan file_system_read_directory
+
+Server MCP Repomix menyediakan dua tools filesystem yang memungkinkan asisten AI untuk berinteraksi dengan aman dengan filesystem lokal:
+
+1. `file_system_read_file`
+  - Membaca konten file dari filesystem lokal menggunakan path absolut
+  - Termasuk validasi keamanan built-in untuk mendeteksi dan mencegah akses ke file yang berisi informasi sensitif
+  - Mengimplementasikan validasi keamanan menggunakan [Secretlint](https://github.com/secretlint/secretlint)
+  - Mencegah akses ke file yang berisi informasi sensitif (API keys, password, secrets)
+  - Memvalidasi path absolut untuk mencegah serangan directory traversal
+  - Mengembalikan pesan error yang jelas untuk path yang tidak valid dan masalah keamanan
+
+2. `file_system_read_directory`
+  - Mendaftar konten direktori menggunakan path absolut
+  - Mengembalikan daftar berformat yang menampilkan file dan subdirektori dengan indikator yang jelas
+  - Menampilkan file dan direktori dengan indikator yang jelas (`[FILE]` atau `[DIR]`)
+  - Menyediakan navigasi direktori yang aman dengan penanganan error yang tepat
+  - Memvalidasi path dan memastikan mereka absolut
+  - Berguna untuk mengeksplorasi struktur proyek dan memahami organisasi codebase
+
+Kedua tools menggabungkan tindakan keamanan yang kuat:
+- Validasi path absolut untuk mencegah serangan directory traversal
+- Pemeriksaan izin untuk memastikan hak akses yang tepat
+- Integrasi dengan Secretlint untuk deteksi informasi sensitif
+- Pesan error yang jelas untuk debugging dan kesadaran keamanan yang lebih baik
+
+**Contoh:**
+```typescript
+// Membaca file
+const fileContent = await tools.file_system_read_file({
+  path: '/absolute/path/to/file.txt'
+});
+
+// Mendaftar konten direktori
+const dirContent = await tools.file_system_read_directory({
+  path: '/absolute/path/to/directory'
+});
+```
+
+Tools ini sangat berguna ketika asisten AI perlu:
+- Menganalisis file spesifik dalam codebase
+- Menavigasi struktur direktori
+- Memverifikasi eksistensi dan aksesibilitas file
+- Memastikan operasi filesystem yang aman
+
+## Manfaat Menggunakan Repomix sebagai Server MCP
+
+Menggunakan Repomix sebagai server MCP menawarkan beberapa keuntungan:
+
+1. **Integrasi Langsung**: Asisten AI dapat menganalisis codebase Anda secara langsung tanpa persiapan file manual.
+2. **Workflow Efisien**: Merampingkan proses analisis kode dengan menghilangkan kebutuhan untuk menghasilkan dan mengunggah file secara manual.
+3. **Output Konsisten**: Memastikan asisten AI menerima codebase dalam format yang konsisten dan dioptimalkan.
+4. **Fitur Lanjutan**: Memanfaatkan semua fitur Repomix seperti kompresi kode, penghitungan token, dan pemeriksaan keamanan.
+
+Setelah dikonfigurasi, asisten AI Anda dapat langsung menggunakan kemampuan Repomix untuk menganalisis codebase, membuat workflow analisis kode lebih efisien.

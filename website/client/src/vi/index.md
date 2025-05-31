@@ -75,13 +75,16 @@ npx repomix
 Hoặc cài đặt toàn cục để sử dụng nhiều lần:
 
 ```bash
-# Cài đặt bằng npm
+# Cài đặt với npm
 npm install -g repomix
 
-# Hoặc sử dụng yarn
+# Hoặc với yarn
 yarn global add repomix
 
-# Hoặc sử dụng Homebrew (macOS/Linux)
+# Hoặc với bun
+bun add -g repomix
+
+# Hoặc với Homebrew (macOS/Linux)
 brew install repomix
 
 # Sau đó chạy trong bất kỳ thư mục dự án nào

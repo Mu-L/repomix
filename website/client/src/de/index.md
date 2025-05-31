@@ -80,6 +80,9 @@ npm install -g repomix
 # Alternativ mit yarn
 yarn global add repomix
 
+# Alternativ mit bun
+bun add -g repomix
+
 # Alternativ mit Homebrew (macOS/Linux)
 brew install repomix
 

@@ -75,13 +75,16 @@ npx repomix
 Atau instal secara global untuk penggunaan berulang:
 
 ```bash
-# Instal menggunakan npm
+# Instal dengan npm
 npm install -g repomix
 
-# Alternatif menggunakan yarn
+# Atau dengan yarn
 yarn global add repomix
 
-# Alternatif menggunakan Homebrew (macOS/Linux)
+# Atau dengan bun
+bun add -g repomix
+
+# Atau dengan Homebrew (macOS/Linux)
 brew install repomix
 
 # Kemudian jalankan di direktori proyek mana pun

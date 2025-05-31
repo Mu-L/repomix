@@ -82,6 +82,9 @@ npm install -g repomix
 # 또는 yarn으로 설치
 yarn global add repomix
 
+# 또는 bun으로 설치
+bun add -g repomix
+
 # 또는 Homebrew로 설치 (macOS/Linux)
 brew install repomix
 

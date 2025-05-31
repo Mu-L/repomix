@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { loadFileConfig, mergeConfigs } from '../../src/config/configLoad.js';
 import type { RepomixConfigCli, RepomixConfigFile } from '../../src/config/configSchema.js';
 import { getGlobalDirectory } from '../../src/config/globalDirectory.js';
-import { RepomixConfigValidationError } from '../../src/shared/errorHandle.js';
+import { RepomixConfigValidationError, RepomixError } from '../../src/shared/errorHandle.js';
 import { logger } from '../../src/shared/logger.js';
 
 vi.mock('node:fs/promises');
@@ -59,13 +59,15 @@ describe('configLoad', () => {
       };
       vi.mocked(getGlobalDirectory).mockReturnValue('/global/repomix');
       vi.mocked(fs.stat)
-        .mockRejectedValueOnce(new Error('File not found')) // Local config
-        .mockResolvedValueOnce({ isFile: () => true } as Stats); // Global config
+        .mockRejectedValueOnce(new Error('File not found')) // Local repomix.config.json5
+        .mockRejectedValueOnce(new Error('File not found')) // Local repomix.config.jsonc
+        .mockRejectedValueOnce(new Error('File not found')) // Local repomix.config.json
+        .mockResolvedValueOnce({ isFile: () => true } as Stats); // Global repomix.config.json5
       vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockGlobalConfig));
 
       const result = await loadFileConfig(process.cwd(), null);
       expect(result).toEqual(mockGlobalConfig);
-      expect(fs.readFile).toHaveBeenCalledWith(path.join('/global/repomix', 'repomix.config.json'), 'utf-8');
+      expect(fs.readFile).toHaveBeenCalledWith(path.join('/global/repomix', 'repomix.config.json5'), 'utf-8');
     });
 
     test('should return an empty object if no config file is found', async () => {
@@ -77,6 +79,9 @@ describe('configLoad', () => {
       expect(result).toEqual({});
 
       expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('No custom config found'));
+      expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('repomix.config.json5'));
+      expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('repomix.config.jsonc'));
+      expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('repomix.config.json'));
     });
 
     test('should throw an error for invalid JSON', async () => {
@@ -137,6 +142,45 @@ describe('configLoad', () => {
           customPatterns: ['*.log', '*.tmp', '*.temp'],
         },
       });
+    });
+
+    test('should load .jsonc config file with priority order', async () => {
+      const mockConfig = {
+        output: { filePath: 'jsonc-output.txt' },
+        ignore: { useDefaultPatterns: true },
+      };
+      vi.mocked(fs.stat)
+        .mockRejectedValueOnce(new Error('File not found')) // repomix.config.json5
+        .mockResolvedValueOnce({ isFile: () => true } as Stats); // repomix.config.jsonc
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockConfig));
+
+      const result = await loadFileConfig(process.cwd(), null);
+      expect(result).toEqual(mockConfig);
+      expect(fs.readFile).toHaveBeenCalledWith(path.resolve(process.cwd(), 'repomix.config.jsonc'), 'utf-8');
+    });
+
+    test('should prioritize .json5 over .jsonc and .json', async () => {
+      const mockConfig = {
+        output: { filePath: 'json5-output.txt' },
+        ignore: { useDefaultPatterns: true },
+      };
+      vi.mocked(fs.stat).mockResolvedValueOnce({ isFile: () => true } as Stats); // repomix.config.json5 exists
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(mockConfig));
+
+      const result = await loadFileConfig(process.cwd(), null);
+      expect(result).toEqual(mockConfig);
+      expect(fs.readFile).toHaveBeenCalledWith(path.resolve(process.cwd(), 'repomix.config.json5'), 'utf-8');
+      // Should not check for .jsonc or .json since .json5 was found
+      expect(fs.stat).toHaveBeenCalledTimes(1);
+    });
+
+    test('should throw RepomixError when specific config file does not exist', async () => {
+      const nonExistentConfigPath = 'non-existent-config.json';
+      vi.mocked(fs.stat).mockRejectedValue(new Error('File not found'));
+
+      await expect(loadFileConfig(process.cwd(), nonExistentConfigPath)).rejects.toThrow(
+        `Config file not found at ${nonExistentConfigPath}`,
+      );
     });
   });
 

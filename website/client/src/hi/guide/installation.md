@@ -32,6 +32,12 @@ yarn global add repomix
 pnpm add -g repomix
 ```
 
+### Bun
+
+```bash
+bun add -g repomix
+```
+
 ### Homebrew के साथ (macOS और Linux)
 
 ```bash

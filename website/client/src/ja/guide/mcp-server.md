@@ -66,6 +66,14 @@ Cursorでは、`Cursor Settings` > `MCP` > `+ Add new global MCP server`からCl
 
 `claude_desktop_config.json`ファイルをClineの設定と同様に編集します。
 
+### Claude Codeの場合
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)でRepomixをMCPサーバーとして設定するには、以下のコマンドを使用します：
+
+```bash
+claude mcp add repomix -- npx -y repomix --mcp
+```
+
 ### npxの代わりにDockerを使用
 
 Dockerを使用してRepomixをMCPサーバーとして実行できます：

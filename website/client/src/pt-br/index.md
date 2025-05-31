@@ -74,13 +74,16 @@ npx repomix
 Ou instale globalmente para uso repetido:
 
 ```bash
-# Instalar usando npm
+# Instalar com npm
 npm install -g repomix
 
-# Alternativamente usando yarn
+# Ou com yarn
 yarn global add repomix
 
-# Alternativamente usando Homebrew (macOS/Linux)
+# Ou com bun
+bun add -g repomix
+
+# Ou com Homebrew (macOS/Linux)
 brew install repomix
 
 # Então execute em qualquer diretório de projeto

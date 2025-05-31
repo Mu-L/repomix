@@ -15,56 +15,72 @@ import {
 } from './configSchema.js';
 import { getGlobalDirectory } from './globalDirectory.js';
 
-const defaultConfigPath = 'repomix.config.json';
+const defaultConfigPaths = ['repomix.config.json5', 'repomix.config.jsonc', 'repomix.config.json'];
 
-const getGlobalConfigPath = () => {
-  return path.join(getGlobalDirectory(), 'repomix.config.json');
+const getGlobalConfigPaths = () => {
+  const globalDir = getGlobalDirectory();
+  return defaultConfigPaths.map((configPath) => path.join(globalDir, configPath));
+};
+
+const checkFileExists = async (filePath: string): Promise<boolean> => {
+  try {
+    const stats = await fs.stat(filePath);
+    return stats.isFile();
+  } catch {
+    return false;
+  }
+};
+
+const findConfigFile = async (configPaths: string[], logPrefix: string): Promise<string | null> => {
+  for (const configPath of configPaths) {
+    logger.trace(`Checking for ${logPrefix} config at:`, configPath);
+
+    const fileExists = await checkFileExists(configPath);
+
+    if (fileExists) {
+      logger.trace(`Found ${logPrefix} config at:`, configPath);
+      return configPath;
+    }
+  }
+  return null;
 };
 
 export const loadFileConfig = async (rootDir: string, argConfigPath: string | null): Promise<RepomixConfigFile> => {
-  let useDefaultConfig = false;
-  let configPath = argConfigPath;
-  if (!configPath) {
-    useDefaultConfig = true;
-    configPath = defaultConfigPath;
-  }
+  if (argConfigPath) {
+    // If a specific config path is provided, use it directly
+    const fullPath = path.resolve(rootDir, argConfigPath);
+    logger.trace('Loading local config from:', fullPath);
 
-  const fullPath = path.resolve(rootDir, configPath);
+    const isLocalFileExists = await checkFileExists(fullPath);
 
-  logger.trace('Loading local config from:', fullPath);
-
-  // Check local file existence
-  const isLocalFileExists = await fs
-    .stat(fullPath)
-    .then((stats) => stats.isFile())
-    .catch(() => false);
-
-  if (isLocalFileExists) {
-    return await loadAndValidateConfig(fullPath);
-  }
-
-  if (useDefaultConfig) {
-    // Try to load global config
-    const globalConfigPath = getGlobalConfigPath();
-    logger.trace('Loading global config from:', globalConfigPath);
-
-    const isGlobalFileExists = await fs
-      .stat(globalConfigPath)
-      .then((stats) => stats.isFile())
-      .catch(() => false);
-
-    if (isGlobalFileExists) {
-      return await loadAndValidateConfig(globalConfigPath);
+    if (isLocalFileExists) {
+      return await loadAndValidateConfig(fullPath);
     }
-
-    logger.log(
-      pc.dim(
-        `No custom config found at ${configPath} or global config at ${globalConfigPath}.\nYou can add a config file for additional settings. Please check https://github.com/yamadashy/repomix for more information.`,
-      ),
-    );
-    return {};
+    throw new RepomixError(`Config file not found at ${argConfigPath}`);
   }
-  throw new RepomixError(`Config file not found at ${configPath}`);
+
+  // Try to find a local config file using the priority order
+  const localConfigPaths = defaultConfigPaths.map((configPath) => path.resolve(rootDir, configPath));
+  const localConfigPath = await findConfigFile(localConfigPaths, 'local');
+
+  if (localConfigPath) {
+    return await loadAndValidateConfig(localConfigPath);
+  }
+
+  // Try to find a global config file using the priority order
+  const globalConfigPaths = getGlobalConfigPaths();
+  const globalConfigPath = await findConfigFile(globalConfigPaths, 'global');
+
+  if (globalConfigPath) {
+    return await loadAndValidateConfig(globalConfigPath);
+  }
+
+  logger.log(
+    pc.dim(
+      `No custom config found at ${defaultConfigPaths.join(', ')} or global config at ${globalConfigPaths.join(', ')}.\nYou can add a config file for additional settings. Please check https://github.com/yamadashy/repomix for more information.`,
+    ),
+  );
+  return {};
 };
 
 const loadAndValidateConfig = async (filePath: string): Promise<RepomixConfigFile> => {

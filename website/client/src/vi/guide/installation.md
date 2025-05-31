@@ -34,6 +34,12 @@ yarn global add repomix
 pnpm add -g repomix
 ```
 
+### Sử dụng Bun
+
+```bash
+bun add -g repomix
+```
+
 ### Sử dụng Homebrew (macOS/Linux)
 
 ```bash

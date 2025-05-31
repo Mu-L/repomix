@@ -97,6 +97,9 @@ npm install -g repomix
 # Alternatively using yarn
 yarn global add repomix
 
+# Alternatively using bun
+bun add -g repomix
+
 # Alternatively using Homebrew (macOS/Linux)
 brew install repomix
 
@@ -550,6 +553,9 @@ npm update -g repomix
 
 # Using yarn
 yarn global upgrade repomix
+
+# Using bun
+bun update -g repomix
 ```
 
 Using `npx repomix` is generally more convenient as it always uses the latest version.
@@ -705,6 +711,14 @@ In Cursor, add a new MCP server from `Cursor Settings` > `MCP` > `+ Add new glob
 **For Claude Desktop:**
 
 Edit the `claude_desktop_config.json` file with similar configuration to Cline's config.
+
+**For Claude Code:**
+
+To configure Repomix as an MCP server in [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), use the following command:
+
+```bash
+claude mcp add repomix -- npx -y repomix --mcp
+```
 
 **Using Docker instead of npx:**
 

@@ -78,10 +78,13 @@ npx repomix
 # npm का उपयोग करके इंस्टॉल करें
 npm install -g repomix
 
-# वैकल्पिक रूप से yarn का उपयोग करके
+# या yarn के साथ
 yarn global add repomix
 
-# वैकल्पिक रूप से Homebrew का उपयोग करके (macOS/Linux)
+# या bun के साथ
+bun add -g repomix
+
+# या Homebrew के साथ (macOS/Linux)
 brew install repomix
 
 # फिर किसी भी प्रोजेक्ट डायरेक्टरी में चलाएं
